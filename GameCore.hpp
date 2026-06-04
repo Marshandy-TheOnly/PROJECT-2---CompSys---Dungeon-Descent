@@ -6,320 +6,416 @@
 #include <memory>
 #include <cstdlib>
 
+using namespace std; // Đã thêm theo yêu cầu của bạn
+
 class Player;
+class Character;
 
 // ============================================================================
-// STEP 1: HỆ THỐNG VẬT PHẨM ĐA HÌNH & PHÂN CẤP ĐỘ (ITEM SYSTEM)
+// VẬT PHẨM TỰ ĐỘNG SCALE ĐỘ MẠNH THEO TẦNG (FLOOR)
 // ============================================================================
 class Item {
 protected:
-    std::string name;
-    std::string description;
-    int floorLevel; // Cấp độ tầng (Tầng càng cao đồ càng mạnh)
+    string name;
+    string description;
+    int floorLevel; 
 public:
-    Item(std::string n, std::string d, int lvl) : name(n), description(d), floorLevel(lvl) {}
+    Item(string n, string d, int lvl) : name(n), description(d), floorLevel(lvl) {}
     virtual ~Item() = default;
 
-    // Hàm ảo thuần túy để phân loại vật phẩm
     virtual bool isInstantBoost() const = 0; 
-    virtual void use(Player& player) = 0;
+    virtual void use(Player& user, Character& target) = 0; 
 
-    std::string getName() const { return name; }
-    std::string getDescription() const { return description; }
+    string getName() const { return name; }
+    string getDescription() const { return description; }
 };
 
-// --- NHÓM 1: Vật phẩm dùng TRONG TRẬN (Tốn lượt) ---
+// --- Các bình Potion và Thẻ bùa chú giữ nguyên cơ chế nhưng TẦNG CÀNG CAO CHỈ SỐ CÀNG MẠNH ---
 class HealthPotion : public Item {
 public:
-    HealthPotion(int lvl) : Item("Health Potion Mk-" + std::to_string(lvl), "Restores " + std::to_string(30 + lvl * 15) + " HP during battle.", lvl) {}
+    // Tầng 1 hồi 45 HP, Tầng 5 hồi 105 HP...
+    HealthPotion(int lvl) : Item("Health Potion Mk-" + to_string(lvl), "Restores " + to_string(30 + lvl * 15) + " HP.", lvl) {}
     bool isInstantBoost() const override { return false; }
-    void use(Player& player) override; // Định nghĩa chi tiết ở dưới
+    void use(Player& user, Character& target) override; 
 };
 
 class ManaPotion : public Item {
 public:
-    ManaPotion(int lvl) : Item("Mana Potion Mk-" + std::to_string(lvl), "Restores " + std::to_string(20 + lvl * 10) + " Mana during battle.", lvl) {}
+    // Tầng 1 hồi 30 Mana, Tầng 5 hồi 70 Mana...
+    ManaPotion(int lvl) : Item("Mana Potion Mk-" + to_string(lvl), "Restores " + to_string(20 + lvl * 10) + " Mana.", lvl) {}
     bool isInstantBoost() const override { return false; }
-    void use(Player& player) override;
+    void use(Player& user, Character& target) override;
 };
 
-// --- NHÓM 2: Vật phẩm tăng THẲNG CHỈ SỐ khi chọn (Instant Boost) ---
+class CursedDoll : public Item { 
+public:
+    // Tầng 1 giảm 6 ATK địch, Tầng 5 giảm 14 ATK địch...
+    CursedDoll(int lvl) : Item("Cursed Doll", "Curses the enemy, reducing their ATK by " + to_string(4 + lvl * 2) + " for 2 turns.", lvl) {}
+    bool isInstantBoost() const override { return false; }
+    void use(Player& user, Character& target) override;
+};
+
+class AcidFlask : public Item { 
+public:
+    // Tầng 1 giảm 5 DEF địch, Tầng 5 giảm 13 DEF địch...
+    AcidFlask(int lvl) : Item("Acid Flask", "Corrodes enemy armor, reducing their DEF by " + to_string(3 + lvl * 2) + " for 2 turns.", lvl) {}
+    bool isInstantBoost() const override { return false; }
+    void use(Player& user, Character& target) override;
+};
+
 class StatScroll : public Item {
 private:
-    int statType; // 1: HP, 2: ATK, 3: DEF
+    int statType; 
 public:
     StatScroll(int lvl, int type) : Item("", "", lvl), statType(type) {
         if (type == 1) {
-            name = "Ancient Vit Scroll (Lvl " + std::to_string(lvl) + ")";
-            description = "Permanently increases Max HP by +" + std::to_string(lvl * 15) + ".";
+            name = "Life Elixir (Lvl " + to_string(lvl) + ")";
+            description = "Permanently increases Max HP by +" + to_string(lvl * 15) + ".";
         } else if (type == 2) {
-            name = "Sharpening Stone (Lvl " + std::to_string(lvl) + ")";
-            description = "Permanently increases Attack Power by +" + std::to_string(lvl * 3) + ".";
+            name = "Steel Sharpener (Lvl " + to_string(lvl) + ")";
+            description = "Permanently increases ATK by +" + to_string(lvl * 3) + ".";
         } else {
-            name = "Iron Core (Lvl " + std::to_string(lvl) + ")";
-            description = "Permanently increases Defense by +" + std::to_string(lvl * 2) + ".";
+            name = "Titanium Core (Lvl " + to_string(lvl) + ")";
+            description = "Permanently increases DEF by +" + to_string(lvl * 2) + ".";
         }
     }
     bool isInstantBoost() const override { return true; }
-    void use(Player& player) override;
+    void use(Player& user, Character& target) override;
 };
 
 // ============================================================================
-// STEP 2: LỚP CƠ SỞ NHÂN VẬT (CHARACTER BASE)
+// LỚP CƠ SỞ NHÂN VẬT (CHARACTER BASE)
 // ============================================================================
 class Character {
 protected:
-    std::string name;
+    string name;
     int hp, maxHp, mana, maxMana;
     int attackPower, defense, intelligence, agility;
     
-    // Chỉ số giảm tạm thời trong trận đấu (dùng cho các chiêu thức hi sinh chỉ số)
-    int tempDefDebuff;
-    int tempAgiDebuff;
+    // Hệ thống quản lý giảm chỉ số (Đã bổ sung bộ đếm cho Agility)
+    int tempAtkDebuff, atkDebuffTurns;
+    int tempDefDebuff, defDefDebuffTurns;
+    int tempAgiDebuff, agiDebuffTurns; // Dùng để khóa né tránh của Rogue
+    int burnDamage, burnTurns;
+    int stunTurns;
+    bool isCounterStance; 
 
 public:
-    Character(std::string n, int h, int m, int atk, int def, int intel, int agi) 
-        : name(n), hp(h), maxHp(h), mana(m), maxMana(m), attackPower(atk), defense(def), intelligence(intel), agility(agi),
-          tempDefDebuff(0), tempAgiDebuff(0) {}
+    Character(string n, int h, int m, int atk, int def, int intel, int agi) 
+        : name(n), hp(h), maxHp(h), mana(m), maxMana(m), attackPower(atk), defense(def), intelligence(intel), agility(agi) {
+            resetCombatModifiers();
+        }
     virtual ~Character() = default;
 
-    virtual std::string attack(Character& target) = 0;
+    virtual string attack(Character& target) = 0;
 
-    // Getters & Setters
-    std::string getName() const { return name; }
+    string getName() const { return name; }
     int getHP() const { return hp; }
     int getMaxHP() const { return maxHp; }
     int getMana() const { return mana; }
     int getMaxMana() const { return maxMana; }
-    int getAttackPower() const { return attackPower; }
-    
-    // Tính chỉ số thực tế sau khi trừ đi Debuff trong trận
-    int getDefense() const { return (defense - tempDefDebuff < 0) ? 0 : (defense - tempDefDebuff); }
-    int getAgility() const { return (agility - tempAgiDebuff < 0) ? 0 : (agility - tempAgiDebuff); }
     int getIntelligence() const { return intelligence; }
     bool isAlive() const { return hp > 0; }
+    int getStunTurns() const { return stunTurns; }
+
+    int getAttackPower() const { 
+        int currentAtk = attackPower - tempAtkDebuff;
+        return (currentAtk < 0) ? 0 : currentAtk;
+    }
+    int getDefense() const { 
+        int currentDef = defense - tempDefDebuff;
+        return (currentDef < 0) ? 0 : currentDef;
+    }
+    // Trả về Agility thực tế (Nếu dính Debuff tự thân của Rogue sẽ bằng 0)
+    int getAgility() const {
+        int currentAgi = agility - tempAgiDebuff;
+        return (currentAgi < 0) ? 0 : currentAgi;
+    }
 
     void setHP(int newHp) { hp = (newHp > maxHp) ? maxHp : (newHp < 0 ? 0 : newHp); }
     void setMana(int newMana) { mana = (newMana > maxMana) ? maxMana : (newMana < 0 ? 0 : newMana); }
-    
-    void applyDefDebuff(int amount) { tempDefDebuff += amount; }
-    void applyAgiDebuff(int amount) { tempAgiDebuff += amount; }
+
+    void applyAtkDebuff(int amount, int turns) { tempAtkDebuff = amount; atkDebuffTurns = turns; }
+    void applyDefDebuff(int amount, int turns) { tempDefDebuff = amount; defDefDebuffTurns = turns; }
+    void applyAgiDebuff(int amount, int turns) { tempAgiDebuff = amount; agiDebuffTurns = turns; }
+    void applyBurn(int dmgPerTurn, int turns) { burnDamage = dmgPerTurn; burnTurns = turns; }
+    void applyStun(int turns) { stunTurns = turns; }
+    void enableCounterStance() { isCounterStance = true; }
+
+    // HÀM QUAN TRỌNG: Trừ lượt hiệu ứng cuối hiệp (Nơi hoàn trả Agility cho Rogue)
+    string updateDurationTicks() {
+        string effectLog = "";
+        if (burnTurns > 0) {
+            hp -= burnDamage; if (hp < 0) hp = 0;
+            effectLog += "\n> " + name + " suffered " + to_string(burnDamage) + " BURN damage!";
+            burnTurns--;
+        }
+        if (stunTurns > 0) stunTurns--;
+        if (atkDebuffTurns > 0) { if (--atkDebuffTurns == 0) tempAtkDebuff = 0; }
+        if (defDefDebuffTurns > 0) { if (--defDefDebuffTurns == 0) tempDefDebuff = 0; }
+        
+        // GIỮ LẠI ĐẾN HẾT LƯỢT ĐỊCH: Hết hiệp đấu mới hồi phục Agility cho Rogue
+        if (agiDebuffTurns > 0) { 
+            if (--agiDebuffTurns == 0) tempAgiDebuff = 0; 
+        }
+        
+        isCounterStance = false; 
+        return effectLog;
+    }
     
     void resetCombatModifiers() {
-        tempDefDebuff = 0;
-        tempAgiDebuff = 0;
+        tempAtkDebuff = 0; atkDebuffTurns = 0;
+        tempDefDebuff = 0; defDefDebuffTurns = 0;
+        tempAgiDebuff = 0; agiDebuffTurns = 0;
+        burnDamage = 0; burnTurns = 0; stunTurns = 0;
+        isCounterStance = false;
     }
 
-    // Logic Nhận sát thương, né tránh và chí mạng
-    std::string takeDamage(int incomingDmg, int attackerInt, const std::string& attackerName) {
-        // Tỷ lệ né = Agility thực tế % (Tối đa 80%)
-        int dodgeChance = getAgility();
-        if (dodgeChance > 80) dodgeChance = 80;
-        
-        if ((std::rand() % 100) < dodgeChance) {
-            return " -> " + name + " DODGED the attack!";
+    string takeDamage(int incomingDmg, int attackerInt, Character* attacker = nullptr, bool forceCrit = false) {
+        // ĐÃ SỬA: Dùng getAgility() thay vì dùng biến raw agility để tính toán chuẩn xác tỷ lệ né dính debuff
+        if (!forceCrit && (rand() % 100) < getAgility()) {
+            return " -> " + name + " nimbly DODGED the attack!";
         }
 
-        // Tỷ lệ chí mạng = Intelligence % (Gấp đôi sát thương)
-        bool isCrit = ((std::rand() % 100) < attackerInt);
+        bool isCrit = forceCrit || ((rand() % 100) < attackerInt);
         if (isCrit) incomingDmg *= 2;
 
-        // Trừ phòng thủ thực tế
         int finalDmg = incomingDmg - getDefense();
-        if (finalDmg < 1) finalDmg = 1; // Đòn đánh trúng tối thiểu mất 1 máu
+        if (finalDmg < 1) finalDmg = 1; 
 
-        hp -= finalDmg;
-        if (hp < 0) hp = 0;
+        // PHẢN ĐÒN CHỈ CÓ HOÀNG TỬ (PRINCE) CÓ
+        if (isCounterStance) {
+            int originalIncomingDmg = finalDmg;
+            
+            finalDmg = static_cast<int>(originalIncomingDmg * 0.5); // NHẬN 50% DAMAGE
+            if (finalDmg < 1) finalDmg = 1;
+            hp -= finalDmg; if (hp < 0) hp = 0;
 
-        std::string res = " -> " + name + " took " + std::to_string(finalDmg) + " dmg" + (isCrit ? " (CRITICAL!)" : ".");
-        if (getDefense() > 0) res += " (Blocked " + std::to_string(getDefense()) + ")";
-        return res;
+            string log = " -> " + name + " parries! Takes only 50% damage (" + to_string(finalDmg) + " dmg).";
+            
+            if (attacker != nullptr) {
+                int reflectedDmg = originalIncomingDmg; // PHẢN LẠI ĐỦ 100% SÁT THƯƠNG GỐC
+                attacker->setHP(attacker->getHP() - reflectedDmg);
+                log += " [ROYAL REFLECT!] Flung " + to_string(reflectedDmg) + " dmg back to " + attacker->getName() + ".";
+            }
+            return log;
+        }
+
+        hp -= finalDmg; if (hp < 0) hp = 0;
+        return " -> " + name + " took " + to_string(finalDmg) + " dmg" + (isCrit ? " (CRITICAL!)" : ".");
     }
 
-    void permanentlyBuff(int h, int a, int d) {
-        maxHp += h; hp += h; attackPower += a; defense += d;
-    }
-    
-    void healFull() { 
-        hp = maxHp; 
-        mana = maxMana;
-    }
+    void permanentlyBuff(int h, int a, int d) { maxHp += h; hp += h; attackPower += a; defense += d; }
+    void healFull() { hp = maxHp; mana = maxMana; }
 };
 
 // ============================================================================
-// STEP 3: LỚP NGƯỜI CHƠI (PLAYER CLASS)
+// LỚP NGƯỜI CHƠI (PLAYER BASE)
 // ============================================================================
 class Player : public Character {
 protected:
-    std::vector<std::unique_ptr<Item>> inventory; // Túi đồ chứa vật phẩm dùng trong trận
+    vector<unique_ptr<Item>> inventory; 
 public:
-    Player(std::string n, int h, int m, int atk, int def, int intel, int agi) 
+    Player(string n, int h, int m, int atk, int def, int intel, int agi) 
         : Character(n, h, m, atk, def, intel, agi) {}
 
-    // Mỗi nhân vật có đúng 2 kỹ năng chủ động riêng biệt
-    virtual std::string useSkill1(Character& target) = 0;
-    virtual std::string useSkill2(Character& target) = 0;
+    virtual string useSkill1(Character& target) = 0;
+    virtual string useSkill2(Character& target) = 0;
     virtual int getClassType() const = 0; 
-
-    void addItemToBag(std::unique_ptr<Item> item) { inventory.push_back(std::move(item)); }
-    const std::vector<std::unique_ptr<Item>>& getInventory() const { return inventory; }
     
-    std::string useBagItem(size_t index) {
+    void addItemToBag(unique_ptr<Item> item) { inventory.push_back(move(item)); }
+    const vector<unique_ptr<Item>>& getInventory() const { return inventory; }
+    
+    string useBagItem(size_t index, Character& target) {
         if (index < inventory.size()) {
-            std::string msg = "Used " + inventory[index]->getName();
-            inventory[index]->use(*this);
-            inventory.erase(inventory.begin() + index); // Dùng xong xóa khỏi túi
+            string msg = "Used " + inventory[index]->getName();
+            inventory[index]->use(*this, target);
+            inventory.erase(inventory.begin() + index); 
             return msg;
         }
         return "Invalid item!";
     }
 };
 
-// Hiện thực hóa hàm sử dụng vật phẩm sau khi có class Player công khai
-inline void HealthPotion::use(Player& player) { player.setHP(player.getHP() + (30 + floorLevel * 15)); }
-inline void ManaPotion::use(Player& player) { player.setMana(player.getMana() + (20 + floorLevel * 10)); }
-inline void StatScroll::use(Player& player) {
-    if (statType == 1) playerpermanentlyBuff(floorLevel * 15, 0, 0);
-    else if (statType == 2) playerpermanentlyBuff(0, floorLevel * 3, 0);
-    else playerpermanentlyBuff(0, 0, floorLevel * 2);
+// Triển khai bọc inline cho Item sử dụng
+inline void HealthPotion::use(Player& user, Character& target) { user.setHP(user.getHP() + (30 + floorLevel * 15)); }
+inline void ManaPotion::use(Player& user, Character& target) { user.setMana(user.getMana() + (20 + floorLevel * 10)); }
+inline void CursedDoll::use(Player& user, Character& target) { target.applyAtkDebuff(4 + floorLevel * 2, 2); }
+inline void AcidFlask::use(Player& user, Character& target) { target.applyDefDebuff(3 + floorLevel * 2, 2); }
+inline void StatScroll::use(Player& user, Character& target) {
+    if (statType == 1) user.permanentlyBuff(floorLevel * 15, 0, 0);
+    else if (statType == 2) user.permanentlyBuff(0, floorLevel * 3, 0);
+    else user.permanentlyBuff(0, 0, floorLevel * 2);
 }
 
 // ============================================================================
-// STEP 4: 3 LỚP NHÂN VẬT VỚI CƠ CHẾ TIÊU TỐN TÀI NGUYÊN ĐỘC ĐÁO
+// HOÀN THIỆN LOGIC CHI TIẾT 5 CLASS ANH HÙNG
 // ============================================================================
 
-// 1. WARRIOR: Hi sinh Thủ để đổi Sát thương cực đại
-class Warrior : public Player {
+// 1. PRINCE (Hoàng Tử)
+class Prince : public Player {
 public:
-    Warrior(std::string n) : Player(n, 160, 40, 15, 8, 5, 10) {}
-    std::string attack(Character& target) override {
-        return "[Attack] Heavy Slash! " + target.takeDamage(attackPower, intelligence, name);
+    Prince(string n) : Player(n, 150, 60, 18, 10, 10, 10) {}
+    string attack(Character& target) override {
+        return "[Attack] Prince strikes! " + target.takeDamage(getAttackPower(), intelligence, this);
     }
-    // Skill 1: Tốn ít Mana thường
-    std::string useSkill1(Character& target) override {
+    string useSkill1(Character& target) override {
         if (mana < 15) return "Not enough Mana!";
         mana -= 15;
-        return "[Skill 1: Shield Bash] " + target.takeDamage(attackPower + 10, intelligence, name);
+        return "[Skill 1: Royal Strike] " + target.takeDamage(getAttackPower() * 2, intelligence, this);
     }
-    // Skill 2: KHÔNG tốn mana, nhưng tự GIẢM VĨNH VIỄN 3 THỦ trong trận này để chém x3 sát thương
-    std::string useSkill2(Character& target) override {
-        applyDefDebuff(3);
-        int recklessDmg = attackPower * 3;
-        return "[Skill 2: Reckless Break] Sacrificed 3 DEF for this battle! " + target.takeDamage(recklessDmg, intelligence, name);
+    string useSkill2(Character& target) override {
+        if (mana < 20) return "Not enough Mana!";
+        mana -= 20;
+        enableCounterStance(); 
+        return "[Skill 2: Sovereign Guard] Prince enters parry stance! (Takes 50% dmg, Reflects 100% dmg this turn)";
     }
     int getClassType() const override { return 1; }
 };
 
-// 2. MAGE: Dùng máu làm tế phẩm đúc phép bùng nổ
-class Mage : public Player {
+// 2. PRIEST (Mục Sư)
+class Priest : public Player {
+private:
+    int normalAttackBuffCharges; 
 public:
-    Mage(std::string n) : Player(n, 90, 100, 8, 3, 25, 12) {}
-    std::string attack(Character& target) override {
-        return "[Attack] Magic Spark! " + target.takeDamage(attackPower, intelligence, name);
+    Priest(string n) : Player(n, 120, 80, 12, 6, 18, 8) { normalAttackBuffCharges = 0; }
+
+    string attack(Character& target) override {
+        int finalAtk = getAttackPower();
+        string label = "[Attack] Priest strikes! ";
+        if (normalAttackBuffCharges > 0) {
+            finalAtk += 15; 
+            normalAttackBuffCharges--;
+            label = "[Buffed Attack] Holy empowered blow! ";
+        }
+        return label + target.takeDamage(finalAtk, intelligence, this);
     }
-    // Skill 1: Phép tiêu tốn lượng Mana lớn
-    std::string useSkill1(Character& target) override {
-        if (mana < 35) return "Not enough Mana!";
-        mana -= 35;
-        return "[Skill 1: Comet Fireball] " + target.takeDamage(attackPower * 2, intelligence, name);
+    string useSkill1(Character& target) override {
+        if (mana < 15) return "Not enough Mana!";
+        mana -= 15;
+        int healAmt = intelligence * 2;
+        setHP(hp + healAmt);
+        return "[Skill 1: Holy Remedy] Restored " + to_string(healAmt) + " HP to self.";
     }
-    // Skill 2: TỐN 25 MÁU của bản thân để kích hoạt cấm thuật Sát thương x3.5
-    std::string useSkill2(Character& target) override {
-        if (hp <= 25) return "Too weak to offer Blood Sacrifice!";
-        hp -= 25; // Trừ thẳng vào máu hiện tại
-        int bloodDmg = static_cast<int>(attackPower * 3.5);
-        return "[Skill 2: Blood Rupture] Sacrificed 25 HP! " + target.takeDamage(bloodDmg, intelligence, name);
+    string useSkill2(Character& target) override {
+        if (mana < 20) return "Not enough Mana!";
+        mana -= 20;
+        normalAttackBuffCharges = 2; // TĂNG SÁT THƯƠNG ĐÁNH THƯỜNG 2 LẦN TIẾP THEO
+        return "[Skill 2: Grace of Light] Your next 2 normal attacks are blessed with bonus damage!";
     }
     int getClassType() const override { return 2; }
 };
 
-// 3. ROGUE: Hi sinh Sự cơ động (Né tránh) để ám sát chắc chắn Crit
-class Rogue : public Player {
+// 3. BERSERKER (Cuồng Chiến Sĩ)
+class Berserker : public Player {
 public:
-    Rogue(std::string n) : Player(n, 110, 50, 12, 4, 15, 25) {}
-    std::string attack(Character& target) override {
-        return "[Attack] Twin Daggers! " + target.takeDamage(attackPower, intelligence, name);
+    Berserker(string n) : Player(n, 180, 30, 22, 5, 5, 12) {}
+    string attack(Character& target) override {
+        return "[Attack] Berserker swings axe! " + target.takeDamage(getAttackPower(), intelligence, this);
     }
-    // Skill 1: Tốn ít Mana
-    std::string useSkill1(Character& target) override {
-        if (mana < 12) return "Not enough Mana!";
-        mana -= 12;
-        return "[Skill 1: Poison Poison] " + target.takeDamage(attackPower + 12, intelligence, name);
+    string useSkill1(Character& target) override {
+        if (mana < 10) return "Not enough Mana!";
+        mana -= 10;
+        return "[Skill 1: Heavy Cleave] " + target.takeDamage(getAttackPower() * 1.5, intelligence, this);
     }
-    // Skill 2: Tốn 15 Mana, Giảm vĩnh viễn 6 NÉ (Agility) trong trận này để dồn lực bạo kích chí mạng 100%
-    std::string useSkill2(Character& target) override {
-        if (mana < 15) return "Not enough Mana!";
-        mana -= 15;
-        applyAgiDebuff(6); // Giảm né trong trận
-        int shadowDmg = attackPower * 2;
-        // Truyền chỉ số INT bằng 100 để ép hệ thống ép buộc nổ Chí mạng (Critical)
-        return "[Skill 2: Shadow Dance] Sacrificed 6 AGI for guaranteed Critical! " + target.takeDamage(shadowDmg, 100, name);
+    string useSkill2(Character& target) override { 
+        if (hp <= 40) return "Too weak to offer Blood Sacrifice!";
+        hp -= 40; // TRỪ MÁU BẢN THÂN
+        int hyperDmg = getAttackPower() * 4; // GÂY SÁT THƯƠNG RẤT NHIỀU TRONG HIỆP NÀY
+        return "[Skill 2: Desperate Outrage] Sacrificed 40 HP! Devastating strike: " + target.takeDamage(hyperDmg, intelligence, this);
     }
     int getClassType() const override { return 3; }
 };
 
-// ============================================================================
-// STEP 5: LỚP QUÁI VẬT TĂNG THEO TẦNG
-// ============================================================================
-class Monster : public Character {
+// 4. MAGE (Pháp Sư)
+class Mage : public Player {
 public:
-    Monster(int floor) : Character("Floor " + std::to_string(floor) + " Fiend", 0, 0, 0, 0, 0, 0) {
-        this->maxHp = 50 + (floor * 22);
-        this->hp = this->maxHp;
-        this->mana = 0; this->maxMana = 0;
-        this->attackPower = 12 + (floor * 3);
-        this->defense = 1 + (floor * 2);
-        this->intelligence = 5 + floor; 
-        this->agility = 4 + floor;      
+    Mage(string n) : Player(n, 100, 120, 10, 4, 25, 8) {}
+    string attack(Character& target) override {
+        return "[Attack] Mage fires spark! " + target.takeDamage(getAttackPower(), intelligence, this);
     }
-    std::string attack(Character& target) override {
-        return "[" + name + " Claws] " + target.takeDamage(attackPower, intelligence, name);
+    string useSkill1(Character& target) override { 
+        if (mana < 20) return "Not enough Mana!";
+        mana -= 20;
+        target.applyBurn(intelligence, 3); // TIÊU MANA GÂY HIỆU ỨNG BURN
+        return "[Skill 1: Pyroblast] Scorched enemy! (Inflicted BURN damage for 3 turns)";
     }
+    string useSkill2(Character& target) override { 
+        if (mana < 55) return "Not enough Mana!";
+        mana -= 55; // TIÊU LƯỢNG LỚN MANA
+        target.applyStun(1); // GÂY SÁT THƯƠNG VÀ LÀM ĐỊCH MẤT LƯỢT
+        return "[Skill 2: Absolute Zero] Spent 55 Mana! " + target.takeDamage(getAttackPower() * 2.5, intelligence, this) + " and STUNNED the enemy!";
+    }
+    int getClassType() const override { return 4; }
+};
+
+// 5. ROGUE (Sát Thủ)
+class Rogue : public Player {
+public:
+    Rogue(string n) : Player(n, 110, 45, 16, 4, 12, 22) {}
+    string attack(Character& target) override {
+        return "[Attack] Rogue stabs! " + target.takeDamage(getAttackPower(), intelligence, this);
+    }
+    string useSkill1(Character& target) override { 
+        if (mana < 15) return "Not enough Mana!";
+        mana -= 15;
+        
+        // ĐÃ SỬA: Đưa toàn bộ Agility vào hệ thống Debuff kéo dài 1 lượt đầy đủ. 
+        // Quái vật sẽ đánh trước khi Debuff này tự bay màu ở hàm updateDurationTicks.
+        applyAgiDebuff(agility, 1); 
+        
+        return "[Skill 1: Assassinate] Agility dropped to 0 for this round! Guaranteed CRITICAL: " 
+               + target.takeDamage(getAttackPower() * 1.5, intelligence, this, true); // Ép nổ chí mạng 100%
+    }
+    string useSkill2(Character& target) override { 
+        if (mana < 15) return "Not enough Mana!";
+        mana -= 15;
+        target.applyAtkDebuff(8, 2); // POISON ĐỊCH GIẢM DAMAGE ĐỊCH GÂY RA
+        return "[Skill 2: Envenom] Poisoned target! Enemy ATK reduced by -8 for 2 turns.";
+    }
+    int getClassType() const override { return 5; }
 };
 
 // ============================================================================
-// STEP 6: HÀM TẠO 3 PHẦN THƯỞNG NGẪU NHIÊN CHO BẠN LÀM STAGE MÀN HÌNH
+// LỚP ĐỊCH / BOSS (ĐỂ TRỐNG SKILL SET CHO THÀNH VIÊN KHÁC LÀM)
 // ============================================================================
-inline std::vector<std::unique_ptr<Item>> generateThreeRewards(int floor) {
-    std::vector<std::unique_ptr<Item>> choices;
-    for (int i = 0; i < 3; i++) {
-        int roll = std::rand() % 3;
-        if (roll == 0) {
-            choices.push_back(std::make_unique<HealthPotion>(floor));
-        } else if (roll == 1) {
-            choices.push_back(std::make_unique<ManaPotion>(floor));
-        } else {
-            int statType = (std::rand() % 3) + 1; // Thưởng ngẫu nhiên cuộn tăng HP, ATK hoặc DEF
-            choices.push_back(std::make_unique<StatScroll>(floor, statType));
-        }
+class Monster : public Character {
+public:
+    Monster(int floor) : Character("Tower Monster F" + to_string(floor), 60 + floor * 20, 40, 15 + floor * 3, 2 + floor, 5, 5) {}
+    
+    string attack(Character& target) override {
+        return "[" + name + " Attacks] " + target.takeDamage(getAttackPower(), intelligence, this);
     }
-    return choices; // Trả về danh sách 3 món đồ tỷ lệ thuận theo cấp độ tầng
-}
+
+    // --- CHỪA HOÀN TOÀN PHẦN NÀY CHO NGƯỜI KHÁC LÀM ---
+    // Thành viên làm AI quái vật chỉ cần override hoặc code logic tung skill set riêng biệt vào đây.
+    virtual string executeSkillSet(Character& target) {
+        return attack(target); // Mặc định tự đánh thường để game vận hành thông suốt
+    }
+};
+
 
 // ============================================================================
-// STEP 7: TIÊU ĐỀ HỆ THỐNG CHIẾN ĐẤU (COMBAT SYSTEM)
+// HỆ THỐNG ĐIỀU PHỐI CHIẾN ĐẤU (COMBAT SYSTEM)
 // ============================================================================
 class CombatSystem {
 private:
     Player& hero;
     Monster& enemy;
-    std::string battleLog;
+    string battleLog;
     bool isPlayerTurn;
 
 public:
     CombatSystem(Player& p, Monster& m);
-
     void playerAttack();
     void playerSkill1();
     void playerSkill2();
-    void playerUseItem(size_t index);
-    
+    void playerUseItem(size_t index); 
     void executeEnemyTurn(); 
-
     bool isCombatOver() const;
     bool isHeroVictorious() const;
     bool getIsPlayerTurn() const { return isPlayerTurn; }
-    std::string getBattleLog() const { return battleLog; }
+    string getBattleLog() const { return battleLog; }
 };
 
 #endif // GAME_CORE_HPP
