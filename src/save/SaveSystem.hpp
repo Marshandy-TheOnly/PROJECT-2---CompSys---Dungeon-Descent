@@ -8,11 +8,11 @@
 // Q1: WHAT TO SAVE — What changes after each floor?
 // ────────────────────────────────────────────────────────────────────────────
 // After each floor, these Player state variables change:
-//   1. hp, maxHp              (from combat damage + OpportunityStage healing)
-//   2. attackPower, defense   (from OpportunityStage::permanentlyBuff calls)
+//   1. hp, maxHp              (combat damage + OpportunityStage healing)
+//   2. attackPower, defense   (OpportunityStage events call player.permanentlyBuff(...))
 //   3. skillLevels[4]         (leveled up after monster/boss victories)
 //   4. currentStage           (incremented after completing each stage)
-//   5. classType              (player class: Prince/Priest/Berserker/Mage)
+//   5. class type             (not stored on Player directly; derived via virtual getClassType())
 //
 // Monsters and Stages are NOT saved — they're regenerated fresh each floor.
 // Turn flags (isDodging, blockThisTurn) are ephemeral and reset each turn.
