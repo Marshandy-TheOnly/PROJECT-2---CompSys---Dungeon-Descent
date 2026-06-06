@@ -83,25 +83,40 @@ bool loadGame(Player& hero) {
         return false;
     }
 
-    // Extract and convert fields
-    int classType = stoi(fields[1]);
-    int hp = stoi(fields[2]);
-    int maxHp = stoi(fields[3]);
-    int atk = stoi(fields[4]);
-    int def = stoi(fields[5]);
-    int stage = stoi(fields[10]);
+    // Extract and convert fields (robust against corrupt saves)
+    try {
+        const int classType = stoi(fields[1]);
+        const int hp        = stoi(fields[2]);
+        const int maxHp     = stoi(fields[3]);
+        const int atk       = stoi(fields[4]);
+        const int def       = stoi(fields[5]);
+        const int stage     = stoi(fields[10]);
 
-    file.close();
+        const int savedSkillLevels[4] = {
+            stoi(fields[6]), stoi(fields[7]), stoi(fields[8]), stoi(fields[9])
+        };
 
-    // OVERWRITE: Restore parsed values into hero object
-    hero.setHP(hp);
-    hero.setMaxHP(maxHp);
-    hero.setAttackPower(atk);
-    hero.setDefense(def);
-    hero.setCurrentStage(stage);
+        // Prevent loading a save into the wrong hero subclass.
+        if (hero.getClassType() != classType) return false;
 
-    cout << "Game loaded successfully.\n";
-    return true;
+        hero.setMaxHP(maxHp);
+        hero.setHP(hp);
+        hero.setAttackPower(atk);
+        hero.setDefense(def);
+        hero.setCurrentStage(stage);
+
+        // Player has no direct skill-level setter; bring skills up to the saved level.
+        for (int i = 0; i < 4; ++i) {
+            if (savedSkillLevels[i] < 1 || savedSkillLevels[i] > 5) return false;
+            while (hero.getSkillLevel(i) < savedSkillLevels[i]) hero.levelUpSkill(i);
+            if (hero.getSkillLevel(i) != savedSkillLevels[i]) return false;
+        }
+
+        cout << "Game loaded successfully.\n";
+        return true;
+    } catch (const exception&) {
+        return false;
+    }
 }
 
 // ────────────────────────────────────────────────────────────────────────────
