@@ -1,10 +1,9 @@
 #pragma once
 
 // ============================================================================
-// UMBRELLA INCLUDE (minimal slice)
-// Pulls in only the subsystems currently implemented in src/.
-// Full version also wires UI, save, StageManager, and 4 player classes —
-// those are intentionally omitted from this build.
+// UMBRELLA INCLUDE — pulls in the full game engine in one line
+// Individual files live in src/entities/, src/stages/, src/combat/,
+// src/ui/, and src/save/
 // ============================================================================
 
 // --- Entities ---
@@ -16,10 +15,20 @@
 #include "src/entities/Mage.hpp"
 #include "src/entities/Monster.hpp"
 #include "src/entities/Boss.hpp"
+#include "src/entities/MonsterTypes.hpp"
 
 // --- Stages ---
 #include "src/stages/Stage.hpp"
 #include "src/stages/OpportunityStage.hpp"
+#include "src/stages/MonsterStage.hpp"
+#include "src/stages/StageManager.hpp"
 
 // --- Combat ---
 #include "src/combat/CombatSystem.hpp"
+
+// --- UI ---
+#include "src/ui/UIManager.hpp"
+#include "src/ui/Sprites.hpp"
+
+// --- Save ---
+#include "src/save/SaveManager.hpp"

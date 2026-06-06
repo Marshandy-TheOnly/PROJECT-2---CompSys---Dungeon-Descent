@@ -1,0 +1,136 @@
+#include "SaveManager.hpp"
+#include "../entities/Prince.hpp"
+#include "../entities/Priest.hpp"
+#include "../entities/Berserker.hpp"
+#include "../entities/Mage.hpp"
+#include <fstream>
+#include <sstream>
+#include <vector>
+#include <cstdio>
+
+using namespace std;
+
+// ============================================================================
+// SAVE — Write hero state to CSV file
+// Format: name,classType,hp,maxHp,attackPower,defense,skill0,skill1,skill2,skill3,currentStage
+// ============================================================================
+void SaveManager::save(const Player& player, const string& filename) {
+    ofstream file(filename);
+    if (!file.is_open())
+        throw runtime_error("Could not open save file for writing: " + filename);
+
+    // Header row
+    file << "name,classType,hp,maxHp,attackPower,defense,"
+         << "skillLevel0,skillLevel1,skillLevel2,skillLevel3,currentStage\n";
+
+    // Data row
+    file << player.getName()       << ","
+         << player.getClassType()  << ","
+         << player.getHP()         << ","
+         << player.getMaxHP()      << ","
+         << player.getAttackPower()<< ","
+         << player.getDefense()    << ",";
+
+    for (int i = 0; i < 4; i++) {
+        file << player.getSkillLevel(i);
+        if (i < 3) file << ",";
+    }
+
+    file << "," << player.getCurrentStage() << "\n";
+}
+
+// ============================================================================
+// LOAD — Read CSV, construct the correct subclass, restore all stats
+// ============================================================================
+unique_ptr<Player> SaveManager::load(const string& filename) {
+    ifstream file(filename);
+    if (!file.is_open())
+        throw SaveNotFoundException("No save file found: " + filename);
+
+    string header, data;
+    getline(file, header);
+    getline(file, data);
+
+    if (data.empty())
+        throw CorruptSaveException("Save file is empty: " + filename);
+
+    // Parse CSV fields
+    stringstream ss(data);
+    string token;
+    vector<string> fields;
+    while (getline(ss, token, ','))
+        fields.push_back(token);
+
+    if (fields.size() < 11)
+        throw CorruptSaveException("Save file has missing fields: " + filename);
+
+    try {
+        const string name      = fields[0];
+        const int classType    = stoi(fields[1]);
+        const int hp           = stoi(fields[2]);
+        const int maxHp        = stoi(fields[3]);
+        const int atk          = stoi(fields[4]);
+        const int def          = stoi(fields[5]);
+        const int stage        = stoi(fields[10]);
+
+        const int savedSkills[4] = {
+            stoi(fields[6]), stoi(fields[7]), stoi(fields[8]), stoi(fields[9])
+        };
+
+        // Validate skill levels
+        for (int i = 0; i < 4; i++)
+            if (savedSkills[i] < 1 || savedSkills[i] > 5)
+                throw CorruptSaveException("Corrupt skill level in save: " + filename);
+
+        // Construct the correct subclass from classType
+        unique_ptr<Player> player;
+        switch (classType) {
+            case 1:  player = make_unique<Prince>(name);     break;
+            case 2:  player = make_unique<Priest>(name);     break;
+            case 3:  player = make_unique<Berserker>(name);  break;
+            case 4:  player = make_unique<Mage>(name);       break;
+            default: throw CorruptSaveException("Unknown class type in save: " + filename);
+        }
+
+        // Restore stats
+        player->setMaxHP(maxHp);
+        player->setHP(hp);
+        player->setAttackPower(atk);
+        player->setDefense(def);
+        player->setCurrentStage(stage);
+
+        // Bring skills up to saved level (each starts at 1)
+        for (int i = 0; i < 4; i++)
+            while (player->getSkillLevel(i) < savedSkills[i])
+                player->levelUpSkill(i);
+
+        return player;
+
+    } catch (const CorruptSaveException&) {
+        throw;
+    } catch (const exception&) {
+        throw CorruptSaveException("Failed to parse save file: " + filename);
+    }
+}
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+bool SaveManager::saveExists(const string& filename) {
+    ifstream file(filename);
+    return file.is_open();
+}
+
+void SaveManager::deleteSave(const string& filename) {
+    remove(filename.c_str()); // std::remove from <cstdio> — already included
+}
+
+string SaveManager::saveFileName(int classType) {
+    switch (classType) {
+        case 1:  return "save_prince.csv";
+        case 2:  return "save_priest.csv";
+        case 3:  return "save_berserker.csv";
+        case 4:  return "save_mage.csv";
+        default: return "save_unknown.csv";
+    }
+}

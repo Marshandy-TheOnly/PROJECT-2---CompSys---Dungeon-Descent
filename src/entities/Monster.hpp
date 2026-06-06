@@ -14,12 +14,17 @@ protected:
     int stageLevel;
 
 public:
+    // Stage-formula constructor: stats auto-calculated from stage number
     Monster(string n, int stage)
         : Entity(n,
                  30 + stage * 15,
                   8 + stage * 3,
                   2 + stage * 2),
           stageLevel(stage) {}
+
+    // Raw-stats constructor: used by MonsterTypes with custom scaling formulas
+    Monster(string n, int hp, int atk, int def, int stage)
+        : Entity(n, hp, atk, def), stageLevel(stage) {}
 
     string attack(Entity& target) override {
         return "[" + name + "] lunges forward! " + target.takeDamage(getAttackPower());
