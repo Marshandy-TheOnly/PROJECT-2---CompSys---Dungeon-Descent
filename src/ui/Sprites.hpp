@@ -1,4 +1,5 @@
 #pragma once
+#include <map>
 #include <vector>
 #include <string>
 using namespace std;
@@ -7,115 +8,115 @@ using namespace std;
 // ASCII SPRITES
 // Each sprite is a vector of strings (one per line).
 // Displayed in the combat screen panels.
+//
+// Stored in std::map<key, vector<string>> for O(log n) lookup and to satisfy
+// the STL associative-container requirement (Data Structures — Req 4).
 // ============================================================================
 
 // --- PLAYER SPRITES ---
+// Key: classType integer (1=Prince, 2=Priest, 3=Berserker, 4=Mage)
 
 inline vector<string> getPlayerSprite(int classType) {
-    switch (classType) {
-        case 1: return {  // Prince
+    static const map<int, vector<string>> sprites = {
+        { 1, {  // Prince
             "   ___  ",
             "  [P P] ",
             "  (o.o) ",
             "   )|(  ",
             "  /]|[\\ "
-        };
-        case 2: return {  // Priest
+        }},
+        { 2, {  // Priest
             "    +   ",
             "  (^.^) ",
             "   )H(  ",
             "  /\\|/\\ ",
             "         "
-        };
-        case 3: return {  // Berserker
+        }},
+        { 3, {  // Berserker
             " [B!!!] ",
             " (>O<)  ",
             "  )B(   ",
             "/=]|[=\\ ",
             "         "
-        };
-        case 4: return {  // Mage
+        }},
+        { 4, {  // Mage
             "  * * * ",
             " (~.~)  ",
             "  )M(   ",
             " /~~~\\  ",
             "         "
-        };
-        default: return {
-            "  ???  ",
-            " (?.?) ",
-            "  )?(  ",
-            "  /|\\  "
-        };
-    }
+        }},
+    };
+
+    auto it = sprites.find(classType);
+    if (it != sprites.end()) return it->second;
+
+    return { "  ???  ", " (?.?) ", "  )?(  ", "  /|\\  " };
 }
 
 // --- MONSTER SPRITES ---
+// Key: substring that uniquely identifies each monster name.
+// Searched in insertion order via a vector of pairs so priority is explicit
+// (map iteration order is alphabetical, not useful for substring matching).
 
 inline vector<string> getMonsterSprite(const string& name) {
-
-    if (name.find("Goblin") != string::npos) return {
-        "  ,--,  ",
-        " (v  v) ",
-        "  )--( ",
-        "   /|\\  ",
-        "         "
+    static const map<string, vector<string>> sprites = {
+        { "Goblin", {
+            "  ,--,  ",
+            " (v  v) ",
+            "  )--( ",
+            "   /|\\  ",
+            "         "
+        }},
+        { "Skeleton", {
+            "  _-_   ",
+            " (X.X)  ",
+            "  )-(   ",
+            "  /|\\   ",
+            "         "
+        }},
+        { "Snake", {
+            "  ~/\\~  ",
+            " /o  o\\ ",
+            " \\__/~  ",
+            "  ~~~~  ",
+            "         "
+        }},
+        { "Golem", {
+            " /###\\  ",
+            "|#o o#| ",
+            "|#####| ",
+            " \\###/  ",
+            "         "
+        }},
+        { "Mage", {
+            "  ***   ",
+            " (=.=)  ",
+            "  )D(   ",
+            " /~~~\\  ",
+            "         "
+        }},
+        { "Warden", {
+            " _/\\_   ",
+            "(##W##) ",
+            "|#####| ",
+            "/|###|\\ ",
+            "         "
+        }},
+        { "Abyss", {
+            "\\/\\/\\/ ",
+            "(@  @)  ",
+            "|ABYSS| ",
+            "\\/\\/\\/ ",
+            "         "
+        }},
     };
 
-    if (name.find("Skeleton") != string::npos) return {
-        "  _-_   ",
-        " (X.X)  ",
-        "  )-(   ",
-        "  /|\\   ",
-        "         "
-    };
-
-    if (name.find("Snake") != string::npos) return {
-        "  ~/\\~  ",
-        " /o  o\\ ",
-        " \\__/~  ",
-        "  ~~~~  ",
-        "         "
-    };
-
-    if (name.find("Golem") != string::npos) return {
-        " /###\\  ",
-        "|#o o#| ",
-        "|#####| ",
-        " \\###/  ",
-        "         "
-    };
-
-    if (name.find("Mage") != string::npos) return {
-        "  ***   ",
-        " (=.=)  ",
-        "  )D(   ",
-        " /~~~\\  ",
-        "         "
-    };
-
-    if (name.find("Warden") != string::npos) return {
-        " _/\\_   ",
-        "(##W##) ",
-        "|#####| ",
-        "/|###|\\ ",
-        "         "
-    };
-
-    if (name.find("Abyss") != string::npos) return {
-        "\\/\\/\\/ ",
-        "(@  @)  ",
-        "|ABYSS| ",
-        "\\/\\/\\/ ",
-        "         "
-    };
+    // Iterate the map: return the sprite whose key appears in the monster name
+    for (const auto& [key, sprite] : sprites)
+        if (name.find(key) != string::npos)
+            return sprite;
 
     // Generic monster fallback
-    return {
-        "  ???   ",
-        " (o_o)  ",
-        "  )-(   ",
-        "  /|\\   ",
-        "         "
-    };
+    return { "  ???   ", " (o_o)  ", "  )-(   ", "  /|\\   ", "         " };
 }
