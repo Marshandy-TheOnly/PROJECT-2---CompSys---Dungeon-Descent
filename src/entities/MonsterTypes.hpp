@@ -13,7 +13,7 @@
 // ============================================================================
 
 // ----------------------------------------------------------------------------
-// GOBLIN — Low HP, fast. Tries to attack twice occasionally.
+// GOBLIN — Low HP, low ATK. Light early-game pressure.
 // ----------------------------------------------------------------------------
 class Goblin : public Monster {
 public:
@@ -65,7 +65,7 @@ public:
 };
 
 // ----------------------------------------------------------------------------
-// DARK MAGE — Highest ATK scaling, lowest DEF. Maximum threat, minimum armor.
+// DARK MAGE — Highest ATK scaling. Glass-cannon caster, light armor.
 // ----------------------------------------------------------------------------
 class DarkMage : public Monster {
 public:

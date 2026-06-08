@@ -66,9 +66,47 @@ public:
         }
     }
 
+    // Reconstruct the exact stage layout from a saved type list.
+    // Monsters within Monster stages are re-rolled (they were already beaten),
+    // but the Monster/Opportunity split is preserved precisely.
+    void generateStagesFromTypes(const vector<int>& types) {
+        stages.resize(10);
+        for (int i = 0; i < 10; i++) {
+            StageType t = static_cast<StageType>(types[i]);
+            switch (t) {
+                case StageType::MONSTER:
+                    stages[i] = make_unique<MonsterStage>(randomMonster(i + 1));
+                    break;
+                case StageType::OPPORTUNITY:
+                    stages[i] = make_unique<OpportunityStage>();
+                    break;
+                case StageType::MINI_BOSS:
+                    stages[i] = make_unique<BossStage>(
+                        make_unique<Boss>(makeWarden()), StageType::MINI_BOSS);
+                    break;
+                case StageType::FINAL_BOSS:
+                    stages[i] = make_unique<BossStage>(
+                        make_unique<Boss>(makeAbyssLord()), StageType::FINAL_BOSS);
+                    break;
+            }
+        }
+    }
+
     void setSkipNext(bool val) { skipNext = val; }
 
+    // Returns the 10 stage types as integers (for persistence).
+    vector<int> getStageTypes() const {
+        vector<int> types;
+        types.reserve(10);
+        for (int i = 0; i < 10; i++)
+            types.push_back(static_cast<int>(stages[i]->getType()));
+        return types;
+    }
+
     void runGame(Player& player, int startStage = 0) {
+        // Cache stage layout once so we pass the same types to every auto-save.
+        vector<int> stageTypes = getStageTypes();
+
         for (int i = startStage; i < 10; i++) {
 
             if (skipNext) {
@@ -83,16 +121,19 @@ public:
 
             if (!player.isAlive()) return;
 
-            // Auto-save after each stage
+            // Auto-save after each stage (preserve stage layout in save file)
             player.setCurrentStage(i + 1);
             try {
-                SaveManager::save(player, SaveManager::saveFileName(player.getClassType()));
+                SaveManager::save(player, SaveManager::saveFileName(player.getClassType()), stageTypes);
             } catch (...) {
                 // Save failed — warn but don't crash
             }
         }
 
-        if (player.isAlive())
+        if (player.isAlive()) {
+            // Delete save so a completed run doesn't block the next one
+            SaveManager::deleteSave(SaveManager::saveFileName(player.getClassType()));
             UIManager::showVictory(player);
+        }
     }
 };

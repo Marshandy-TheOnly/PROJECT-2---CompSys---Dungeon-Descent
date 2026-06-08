@@ -17,8 +17,11 @@ public:
         return "[Defend] Priest prays! Blocks " + to_string(blockThisTurn) + " dmg and heals " + to_string(healAmt) + " HP.";
     }
     string doUltimate(Entity& target) override {
+        if (ultCooldown > 0)
+            return "[Ultimate: Divine Light] Recharging — " + to_string(ultCooldown) + " turn(s) left.";
         int healAmt = 30;
         setHP(getHP() + healAmt);
+        ultCooldown = 2;
         if (!rollUltimate())
             return "[Ultimate: Divine Light] Healed " + to_string(healAmt) + " HP — but the smite missed!";
         return "[Ultimate: Divine Light] Healed " + to_string(healAmt) + " HP! "

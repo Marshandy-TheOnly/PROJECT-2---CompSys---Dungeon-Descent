@@ -35,5 +35,10 @@ public:
         return attack(target);
     }
 
+    // Returns a non-empty warning string when a special attack will fire
+    // on the NEXT enemy turn.  Regular monsters always return "".
+    // Boss overrides this to give the player a one-turn heads-up.
+    virtual string getForeshadow() const { return ""; }
+
     int getStageLevel() const { return stageLevel; }
 };

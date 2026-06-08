@@ -2,7 +2,10 @@
 #include <map>
 #include <vector>
 #include <string>
+#include <utility>
 using namespace std;
+// NOTE: `using namespace std;` is kept here for consistency with the rest of
+// the codebase. In a clean rewrite, qualify std:: in headers instead.
 
 // ============================================================================
 // ASCII SPRITES
@@ -60,7 +63,24 @@ inline vector<string> getPlayerSprite(int classType) {
 // (map iteration order is alphabetical, not useful for substring matching).
 
 inline vector<string> getMonsterSprite(const string& name) {
-    static const map<string, vector<string>> sprites = {
+    // vector<pair> preserves insertion order — important because we match by
+    // substring. Bosses are listed FIRST so e.g. "Abyss Lord" doesn't fall
+    // through and accidentally match a generic monster key in the future.
+    static const vector<pair<string, vector<string>>> sprites = {
+        { "Abyss", {
+            "\\/\\/\\/ ",
+            "(@  @)  ",
+            "|ABYSS| ",
+            "\\/\\/\\/ ",
+            "         "
+        }},
+        { "Warden", {
+            " _/\\_   ",
+            "(##W##) ",
+            "|#####| ",
+            "/|###|\\ ",
+            "         "
+        }},
         { "Goblin", {
             "  ,--,  ",
             " (v  v) ",
@@ -96,23 +116,9 @@ inline vector<string> getMonsterSprite(const string& name) {
             " /~~~\\  ",
             "         "
         }},
-        { "Warden", {
-            " _/\\_   ",
-            "(##W##) ",
-            "|#####| ",
-            "/|###|\\ ",
-            "         "
-        }},
-        { "Abyss", {
-            "\\/\\/\\/ ",
-            "(@  @)  ",
-            "|ABYSS| ",
-            "\\/\\/\\/ ",
-            "         "
-        }},
     };
 
-    // Iterate the map: return the sprite whose key appears in the monster name
+    // Walk the list in declared order: first key that appears in the name wins.
     for (const auto& [key, sprite] : sprites)
         if (name.find(key) != string::npos)
             return sprite;

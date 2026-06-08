@@ -6,9 +6,12 @@
 
 // ============================================================================
 // SAVE MANAGER — CSV save/load
-// Format: name,classType,hp,maxHp,attackPower,defense,skill0-3,currentStage
-// Location: one file per class (save_prince.csv, save_priest.csv, etc.)
+// Format: name,classType,hp,maxHp,attackPower,defense,skill0-3,currentStage,
+//         stageType0-9
+// Single file: save.csv
 // ============================================================================
+
+#include <vector>
 
 class SaveNotFoundException : public std::runtime_error {
 public:
@@ -22,8 +25,12 @@ public:
 
 class SaveManager {
 public:
-    static void                    save(const Player& player, const std::string& filename);
+    // stageTypes: 10 integers (StageType cast to int) for all 10 stage slots
+    static void                    save(const Player& player, const std::string& filename,
+                                        const std::vector<int>& stageTypes);
     static std::unique_ptr<Player> load(const std::string& filename);
+    // Returns empty vector if save predates stage-layout storage
+    static std::vector<int>        loadStageTypes(const std::string& filename);
     static bool                    saveExists(const std::string& filename);
     static void                    deleteSave(const std::string& filename);
     static std::string             saveFileName(int classType);

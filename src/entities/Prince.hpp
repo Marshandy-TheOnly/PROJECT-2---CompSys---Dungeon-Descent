@@ -15,8 +15,13 @@ public:
         return "[Defend] Prince raises his shield! Blocking " + to_string(blockThisTurn) + " dmg this turn.";
     }
     string doUltimate(Entity& target) override {
-        if (!rollUltimate())
+        if (ultCooldown > 0)
+            return "[Ultimate: Royal Strike] Recharging — " + to_string(ultCooldown) + " turn(s) left.";
+        if (!rollUltimate()) {
+            ultCooldown = 2;
             return "[Ultimate: Royal Strike] Missed! The strike went wide.";
+        }
+        ultCooldown = 2;
         return "[Ultimate: Royal Strike] " + target.takeDamage(getScaledAttack() * 3);
     }
     int getClassType() const override { return 1; }

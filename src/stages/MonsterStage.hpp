@@ -43,10 +43,16 @@ public:
             if (!combat.isCombatOver()) {
                 combat.executeEnemyTurn();
                 log.push_back(combat.getBattleLog());
+                // If the enemy is about to use a special next turn, warn the player
+                string foreshadow = monster->getForeshadow();
+                if (!foreshadow.empty())
+                    log.push_back(foreshadow);
             }
         }
 
         if (combat.isHeroVictorious()) {
+            // No skill-up after the final boss — Victory screen follows immediately
+            if (type == StageType::FINAL_BOSS) return;
             int skill = UIManager::showSkillLevelUp(player);
             player.levelUpSkill(skill);
         } else {
