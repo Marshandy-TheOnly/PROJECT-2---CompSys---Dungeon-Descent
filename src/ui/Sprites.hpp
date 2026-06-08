@@ -63,24 +63,7 @@ inline vector<string> getPlayerSprite(int classType) {
 // (map iteration order is alphabetical, not useful for substring matching).
 
 inline vector<string> getMonsterSprite(const string& name) {
-    // vector<pair> preserves insertion order — important because we match by
-    // substring. Bosses are listed FIRST so e.g. "Abyss Lord" doesn't fall
-    // through and accidentally match a generic monster key in the future.
-    static const vector<pair<string, vector<string>>> sprites = {
-        { "Abyss", {
-            "\\/\\/\\/ ",
-            "(@  @)  ",
-            "|ABYSS| ",
-            "\\/\\/\\/ ",
-            "         "
-        }},
-        { "Warden", {
-            " _/\\_   ",
-            "(##W##) ",
-            "|#####| ",
-            "/|###|\\ ",
-            "         "
-        }},
+    static const map<string, vector<string>> sprites = {
         { "Goblin", {
             "  ,--,  ",
             " (v  v) ",
@@ -116,9 +99,23 @@ inline vector<string> getMonsterSprite(const string& name) {
             " /~~~\\  ",
             "         "
         }},
+        { "Warden", {
+            " _/\\_   ",
+            "(##W##) ",
+            "|#####| ",
+            "/|###|\\ ",
+            "         "
+        }},
+        { "Abyss", {
+            "\\/\\/\\/ ",
+            "(@  @)  ",
+            "|ABYSS| ",
+            "\\/\\/\\/ ",
+            "         "
+        }},
     };
 
-    // Walk the list in declared order: first key that appears in the name wins.
+    // Iterate the map: return the sprite whose key appears in the monster name
     for (const auto& [key, sprite] : sprites)
         if (name.find(key) != string::npos)
             return sprite;
