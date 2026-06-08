@@ -1,6 +1,7 @@
 #pragma once
 #include "Stage.hpp"
 #include "../ui/UIManager.hpp"
+#include "../save/SaveManager.hpp"
 #include <random>
 
 // ============================================================================
@@ -15,7 +16,8 @@
 //   35% failure: take 30 damage
 //
 // Event 2 — Ancient Cache:
-//   Discover a hidden cache. Permanently gain +10 HP.
+//   Discover a hidden cache. Permanently gain +10 HP (stages 1-4)
+//   or +20 HP (stages 5+) — reward scales with how deep you are.
 // ============================================================================
 class OpportunityStage : public Stage {
 private:
@@ -55,10 +57,16 @@ public:
                             "The altar empowers you.\n  Gained: +15 Max HP, +4 ATK, +2 DEF");
                     } else {
                         player.setHP(player.getHP() - 30);
+                        string hpStatus = player.isAlive()
+                            ? "Current HP: " + to_string(player.getHP()) + "/" + to_string(player.getMaxHP())
+                            : "The altar consumed your last life force.";
                         UIManager::showOpportunityEvent(
                             "Forbidden Altar — BACKFIRE!",
-                            "The altar rejects your essence.\n  Lost 30 HP. Current HP: "
-                            + to_string(player.getHP()) + "/" + to_string(player.getMaxHP()));
+                            "The altar rejects your essence.\n  Lost 30 HP. " + hpStatus);
+                        if (!player.isAlive()) {
+                            SaveManager::deleteSave(SaveManager::saveFileName(player.getClassType()));
+                            UIManager::showGameOver();
+                        }
                     }
                 } else {
                     UIManager::showOpportunityEvent(
@@ -68,11 +76,13 @@ public:
                 break;
             }
 
-            case 2: { // Ancient Cache — permanent HP boost
-                player.permanentlyBuff(10, 0, 0);
+            case 2: { // Ancient Cache — permanent HP boost (scales with stage)
+                int bonus = (player.getCurrentStage() >= 5) ? 20 : 10;
+                player.permanentlyBuff(bonus, 0, 0);
                 UIManager::showOpportunityEvent(
                     "Ancient Cache",
-                    "A veteran explorer's hidden stash!\n  Discovered supplies. Max HP permanently +10.\n  Current HP: "
+                    "A veteran explorer's hidden stash!\n  Discovered supplies. Max HP permanently +"
+                    + to_string(bonus) + ".\n  Current HP: "
                     + to_string(player.getHP()) + "/" + to_string(player.getMaxHP()));
                 break;
             }

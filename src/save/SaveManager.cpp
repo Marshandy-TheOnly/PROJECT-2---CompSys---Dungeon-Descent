@@ -11,32 +11,42 @@
 using namespace std;
 
 // ============================================================================
-// SAVE — Write hero state to CSV file
-// Format: name,classType,hp,maxHp,attackPower,defense,skill0,skill1,skill2,skill3,currentStage
+// SAVE — Write hero state + stage layout to CSV
+// Format: name,classType,hp,maxHp,attackPower,defense,
+//         skill0,skill1,skill2,skill3,currentStage,
+//         stageType0,...,stageType9
 // ============================================================================
-void SaveManager::save(const Player& player, const string& filename) {
+void SaveManager::save(const Player& player, const string& filename,
+                       const vector<int>& stageTypes) {
     ofstream file(filename);
     if (!file.is_open())
         throw runtime_error("Could not open save file for writing: " + filename);
 
     // Header row
     file << "name,classType,hp,maxHp,attackPower,defense,"
-         << "skillLevel0,skillLevel1,skillLevel2,skillLevel3,currentStage\n";
+         << "skillLevel0,skillLevel1,skillLevel2,skillLevel3,currentStage,"
+         << "type0,type1,type2,type3,type4,type5,type6,type7,type8,type9\n";
 
-    // Data row
-    file << player.getName()       << ","
-         << player.getClassType()  << ","
-         << player.getHP()         << ","
-         << player.getMaxHP()      << ","
-         << player.getAttackPower()<< ","
-         << player.getDefense()    << ",";
+    // Player data
+    file << player.getName()        << ","
+         << player.getClassType()   << ","
+         << player.getHP()          << ","
+         << player.getMaxHP()       << ","
+         << player.getAttackPower() << ","
+         << player.getDefense()     << ",";
 
     for (int i = 0; i < 4; i++) {
         file << player.getSkillLevel(i);
         if (i < 3) file << ",";
     }
 
-    file << "," << player.getCurrentStage() << "\n";
+    file << "," << player.getCurrentStage();
+
+    // Stage layout (10 type integers)
+    for (int i = 0; i < 10 && i < (int)stageTypes.size(); i++)
+        file << "," << stageTypes[i];
+
+    file << "\n";
 }
 
 // ============================================================================
@@ -125,12 +135,36 @@ void SaveManager::deleteSave(const string& filename) {
     remove(filename.c_str()); // std::remove from <cstdio> — already included
 }
 
-string SaveManager::saveFileName(int classType) {
-    switch (classType) {
-        case 1:  return "save_prince.csv";
-        case 2:  return "save_priest.csv";
-        case 3:  return "save_berserker.csv";
-        case 4:  return "save_mage.csv";
-        default: return "save_unknown.csv";
+// Returns the 10 stage-type integers from fields[11..20].
+// Returns an empty vector if the save predates layout storage (old format).
+vector<int> SaveManager::loadStageTypes(const string& filename) {
+    ifstream file(filename);
+    if (!file.is_open()) return {};
+
+    string header, data;
+    getline(file, header);
+    getline(file, data);
+    if (data.empty()) return {};
+
+    stringstream ss(data);
+    string token;
+    vector<string> fields;
+    while (getline(ss, token, ','))
+        fields.push_back(token);
+
+    if (fields.size() < 21) return {};   // old format — no layout stored
+
+    vector<int> types;
+    try {
+        for (int i = 11; i < 21; i++)
+            types.push_back(stoi(fields[i]));
+    } catch (...) {
+        return {};
     }
+    return types;
+}
+
+string SaveManager::saveFileName(int /*classType*/) {
+    // Single save file regardless of class — eliminates multi-file collision bugs.
+    return "save.csv";
 }

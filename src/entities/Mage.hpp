@@ -15,8 +15,13 @@ public:
         return "[Defend] Mage conjures a barrier! Blocking " + to_string(blockThisTurn) + " dmg this turn.";
     }
     string doUltimate(Entity& target) override {
-        if (!rollUltimate())
+        if (ultCooldown > 0)
+            return "[Ultimate: Absolute Zero] Recharging — " + to_string(ultCooldown) + " turn(s) left.";
+        if (!rollUltimate()) {
+            ultCooldown = 2;
             return "[Ultimate: Absolute Zero] Spell fizzled! The incantation failed.";
+        }
+        ultCooldown = 2;
         return "[Ultimate: Absolute Zero] " + target.takeDamage(getScaledAttack() * 5);
     }
     int getClassType() const override { return 4; }

@@ -11,28 +11,22 @@ int main() {
         int startStage = 0;
 
         if (menuChoice == 1) {
-            // --- CONTINUE: try loading each class save ---
-            bool loaded = false;
-            for (int c = 1; c <= 4; c++) {
-                string filename = SaveManager::saveFileName(c);
-                if (SaveManager::saveExists(filename)) {
-                    try {
-                        player     = SaveManager::load(filename);
-                        startStage = player->getCurrentStage();
-                        loaded     = true;
-                        break;
-                    } catch (CorruptSaveException&) {
-                        UIManager::showOpportunityEvent(
-                            "Corrupt Save",
-                            "Save file was corrupt — returning to menu.");
-                    }
-                }
-            }
-            if (!loaded) {
+            // --- CONTINUE: single save file ---
+            string filename = SaveManager::saveFileName(0);
+            if (!SaveManager::saveExists(filename)) {
                 UIManager::showOpportunityEvent(
                     "No Save Found",
                     "No save file found — returning to menu.");
-                continue; // back to main menu, do NOT start a new game
+                continue;
+            }
+            try {
+                player     = SaveManager::load(filename);
+                startStage = player->getCurrentStage();
+            } catch (CorruptSaveException&) {
+                UIManager::showOpportunityEvent(
+                    "Corrupt Save",
+                    "Save file was corrupt — returning to menu.");
+                continue;
             }
         }
 
@@ -49,7 +43,25 @@ int main() {
         }
 
         StageManager manager;
-        manager.generateStages();
+
+        if (menuChoice == 1) {
+            // Continue: restore the exact stage layout that was saved
+            string filename = SaveManager::saveFileName(0);
+            vector<int> savedTypes = SaveManager::loadStageTypes(filename);
+            // Sanity-check the boss slots — if a tampered/corrupt save would
+            // skip a boss, fall back to a fresh layout instead.
+            bool layoutValid =
+                savedTypes.size() == 10 &&
+                savedTypes[4] == static_cast<int>(StageType::MINI_BOSS) &&
+                savedTypes[9] == static_cast<int>(StageType::FINAL_BOSS);
+            if (layoutValid)
+                manager.generateStagesFromTypes(savedTypes);
+            else
+                manager.generateStages(); // old-format or corrupt — fresh layout
+        } else {
+            manager.generateStages();
+        }
+
         manager.runGame(*player, startStage);
         // When runGame returns (win or lose), loop back to main menu
     }

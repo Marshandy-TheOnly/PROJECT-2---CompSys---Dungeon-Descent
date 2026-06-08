@@ -2,9 +2,11 @@
 #include "ftxui/component/component.hpp"
 #include "ftxui/component/screen_interactive.hpp"
 #include "ftxui/dom/elements.hpp"
+#include <chrono>
 
 using namespace ftxui;
 using namespace std;
+using namespace std::chrono;
 
 // ============================================================================
 // HELPERS
@@ -75,7 +77,7 @@ int UIManager::showClassSelect() {
           "Ultimate: Heal 30 HP + 2x ATK." },
         { "HP: 180  ATK: 22  DEF: 5",
           "Highest HP and ATK.",
-          "Ultimate sacrifices 40 HP.",
+          "Ultimate sacrifices 25% of current HP.",
           "Ultimate: 4x ATK — high risk." },
         { "HP: 100  ATK: 10  DEF: 4",
           "Glass cannon.",
@@ -118,8 +120,8 @@ int UIManager::getPlayerAction(Player& player, Monster& enemy,
     vector<string> actions = {
         "Attack",
         "Defend",
-        player.canDodge() ? "Dodge" : "Dodge  [on cooldown]",
-        "Ultimate",
+        player.canDodge()        ? "Dodge"    : "Dodge     [on cooldown]",
+        player.canUseUltimate()  ? "Ultimate" : "Ultimate  [recharging: " + to_string(player.getUltCooldown()) + " turn(s)]",
     };
     int selected = 0;
     auto menu = Menu(&actions, &selected);
@@ -191,12 +193,17 @@ int UIManager::showSkillLevelUp(Player& player, const string& title) {
     auto screen = ScreenInteractive::Fullscreen();
 
     auto lvStr = [&](int idx) { return to_string(player.getSkillLevel(idx)); };
-    auto nxStr = [&](int idx) { return to_string(player.getSkillLevel(idx) + 1); };
+    // Cap next-level display at 5 — levelUpSkill() is a no-op at max, so
+    // showing "-> Lv 6" would be misleading and waste the player's upgrade.
+    auto nxStr = [&](int idx) {
+        int cur = player.getSkillLevel(idx);
+        return cur >= 5 ? string("MAX") : to_string(cur + 1);
+    };
 
     vector<string> skills = {
-        "ATK    Lv " + lvStr(0) + " -> Lv " + nxStr(0) + "   (+3 dmg per level)",
+        "ATK    Lv " + lvStr(0) + " -> Lv " + nxStr(0) + "   (+8 dmg per level)",
         "DEF    Lv " + lvStr(1) + " -> Lv " + nxStr(1) + "   (+4 block per level)",
-        "DODGE  Lv " + lvStr(2) + " -> Lv " + nxStr(2) + "   (+5% success chance)",
+        "DODGE  Lv " + lvStr(2) + " -> Lv " + nxStr(2) + "   (+7% success chance)",
         "ULT    Lv " + lvStr(3) + " -> Lv " + nxStr(3) + "   (-5% miss chance)",
     };
     int selected = 0;
@@ -255,10 +262,9 @@ bool UIManager::showConfirm(const string& prompt) {
 
 void UIManager::showOpportunityEvent(const string& eventName, const string& desc) {
     auto screen = ScreenInteractive::Fullscreen();
-    bool ready = false;
+    auto birth = steady_clock::now();
 
     auto component = CatchEvent(Renderer([&] {
-        ready = true;
         return vbox({
             text("OPPORTUNITY EVENT") | bold | color(Color::Yellow) | center,
             separator(),
@@ -268,7 +274,8 @@ void UIManager::showOpportunityEvent(const string& eventName, const string& desc
             text("Press Enter to continue") | dim | center,
         }) | border;
     }), [&](Event e) {
-        if (ready && e == Event::Return) { screen.ExitLoopClosure()(); return true; }
+        auto age = duration_cast<milliseconds>(steady_clock::now() - birth).count();
+        if (age > 120 && e == Event::Return) { screen.ExitLoopClosure()(); return true; }
         return false;
     });
 
@@ -281,7 +288,7 @@ void UIManager::showOpportunityEvent(const string& eventName, const string& desc
 
 void UIManager::showStageTransition(int stageNum, StageType type) {
     auto screen = ScreenInteractive::Fullscreen();
-    bool ready = false;
+    auto birth = steady_clock::now();
 
     string typeStr;
     Color  typeColor = Color::White;
@@ -293,7 +300,6 @@ void UIManager::showStageTransition(int stageNum, StageType type) {
     }
 
     auto component = CatchEvent(Renderer([&] {
-        ready = true;
         return vbox({
             text("STAGE " + to_string(stageNum) + " / 10") | bold | center,
             text(typeStr) | bold | color(typeColor) | center,
@@ -301,7 +307,8 @@ void UIManager::showStageTransition(int stageNum, StageType type) {
             text("Press Enter to begin") | dim | center,
         }) | border;
     }), [&](Event e) {
-        if (ready && e == Event::Return) { screen.ExitLoopClosure()(); return true; }
+        auto age = duration_cast<milliseconds>(steady_clock::now() - birth).count();
+        if (age > 120 && e == Event::Return) { screen.ExitLoopClosure()(); return true; }
         return false;
     });
 
@@ -314,10 +321,9 @@ void UIManager::showStageTransition(int stageNum, StageType type) {
 
 void UIManager::showVictory(Player& player) {
     auto screen = ScreenInteractive::Fullscreen();
-    bool ready = false;
+    auto birth = steady_clock::now();
 
     auto component = CatchEvent(Renderer([&] {
-        ready = true;
         return vbox({
             text("YOU WIN!") | bold | color(Color::Yellow) | center,
             text("The dungeon has been cleared!") | center,
@@ -331,7 +337,8 @@ void UIManager::showVictory(Player& player) {
             text("Press Enter to exit") | dim | center,
         }) | border;
     }), [&](Event e) {
-        if (ready && e == Event::Return) { screen.ExitLoopClosure()(); return true; }
+        auto age = duration_cast<milliseconds>(steady_clock::now() - birth).count();
+        if (age > 120 && e == Event::Return) { screen.ExitLoopClosure()(); return true; }
         return false;
     });
 
@@ -344,10 +351,9 @@ void UIManager::showVictory(Player& player) {
 
 void UIManager::showGameOver() {
     auto screen = ScreenInteractive::Fullscreen();
-    bool ready = false;
+    auto birth = steady_clock::now();
 
     auto component = CatchEvent(Renderer([&] {
-        ready = true;
         return vbox({
             text("GAME OVER") | bold | color(Color::Red) | center,
             text("You have fallen in the dungeon...") | center,
@@ -355,7 +361,8 @@ void UIManager::showGameOver() {
             text("Press Enter to exit") | dim | center,
         }) | border;
     }), [&](Event e) {
-        if (ready && e == Event::Return) { screen.ExitLoopClosure()(); return true; }
+        auto age = duration_cast<milliseconds>(steady_clock::now() - birth).count();
+        if (age > 120 && e == Event::Return) { screen.ExitLoopClosure()(); return true; }
         return false;
     });
 

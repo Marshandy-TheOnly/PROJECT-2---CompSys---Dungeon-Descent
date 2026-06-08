@@ -2,7 +2,10 @@
 #include <map>
 #include <vector>
 #include <string>
+#include <utility>
 using namespace std;
+// NOTE: `using namespace std;` is kept here for consistency with the rest of
+// the codebase. In a clean rewrite, qualify std:: in headers instead.
 
 // ============================================================================
 // ASCII SPRITES

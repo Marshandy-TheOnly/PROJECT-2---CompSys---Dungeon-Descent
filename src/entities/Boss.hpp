@@ -4,11 +4,11 @@
 // ============================================================================
 // BOSS — Amplified monster with turn-counter mechanic
 // Stats are significantly boosted from base Monster:
-//   HP  *= 2.5
-//   ATK *= 1.5
-//   DEF += 4
+//   HP  *= 2.0   (was 2.5)
+//   ATK *= 1.3   (was 1.5)
+//   DEF += 4     (Abyss Lord overrides to 16 via setDefense() in factory)
 //
-// Turn counter: every 3rd turn fires a devastating special skill
+// Turn counter: every 4th turn fires a devastating special skill
 // that deals double ATK damage instead of the normal attack.
 // ============================================================================
 class Boss : public Monster {
@@ -19,21 +19,28 @@ private:
 public:
     Boss(string n, int stage, string skill = "Devastation")
         : Monster(n, stage), turnCounter(0), skillName(skill) {
-        maxHp = hp = static_cast<int>(hp * 2.5f);
-        attackPower = static_cast<int>(attackPower * 1.5f);
+        maxHp = hp = static_cast<int>(hp * 2.0f);   // was 2.5 — less of a damage sponge
+        attackPower = static_cast<int>(attackPower * 1.3f); // was 1.5 — survivable hits
         defense += 4;
     }
 
     string executeSkillSet(Entity& target) override {
         turnCounter++;
 
-        if (turnCounter % 3 == 0) {
+        if (turnCounter % 4 == 0) {   // was every 3rd turn — now every 4th
             return "[" + name + " — " + skillName + "] "
                    "BOSS SKILL ACTIVATED! "
                    + target.takeDamage(getAttackPower() * 2);
         }
 
         return "[" + name + "] " + target.takeDamage(getAttackPower());
+    }
+
+    // Warn the player one turn before the special fires
+    string getForeshadow() const override {
+        if ((turnCounter + 1) % 4 == 0)
+            return "!! " + name + " is winding up " + skillName + "... brace yourself!";
+        return "";
     }
 
     int    getTurnCounter() const { return turnCounter; }
@@ -44,9 +51,22 @@ public:
 // BOSS FACTORY FUNCTIONS
 // ============================================================================
 inline Boss makeWarden() {
-    return Boss("The Warden", 5, "Iron Verdict");
+    Boss b("The Warden", 5, "Iron Verdict");
+    // Significantly toned down from formula-derived values (HP 210, ATK 29, DEF 16)
+    // so the mid-boss is a learning fight, not a brick wall.
+    b.setMaxHP(140);
+    b.setHP(140);
+    b.setAttackPower(20);
+    b.setDefense(8);
+    return b;
 }
 
 inline Boss makeAbyssLord() {
-    return Boss("Abyss Lord", 10, "Void Collapse");
+    Boss b("Abyss Lord", 10, "Void Collapse");
+    // Significantly reduced from formula-derived values (HP 360, ATK 49, DEF 26)
+    b.setMaxHP(220);
+    b.setHP(220);
+    b.setAttackPower(28);
+    b.setDefense(10);
+    return b;
 }
